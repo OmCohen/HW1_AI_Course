@@ -3,7 +3,7 @@
 The way to use this code is to subclass Problem to create a class of problems,
 then create problem instances and solve them with calls to the various search
 functions."""
-
+import utils
 from utils import (
     is_in, argmin, argmax, argmax_random_tie, probability, weighted_sampler,
     memoize, print_table, open_data, Stack, FIFOQueue, PriorityQueue, name,
@@ -136,6 +136,8 @@ class Node:
     def __hash__(self):
         return hash(self.state)
 
+    def __getstate__(self):
+        return self.state
 # ______________________________________________________________________________
 
 
@@ -151,5 +153,14 @@ def astar_search(problem, h=None):
     f = memoize(lambda n: n.path_cost + h(n), 'f')
 
     # TODO: Implement the rest of the A* search algorithm
+    #new min queue
+    open = utils.PriorityQueue(order = min , lambda x: x.path_cost + h(x))
+    #starting Node is the initial
+    start = Node(problem.initial)
+    open.append(start)
+    closed = []
+    while len(open) != 0:
+        new = open.pop()
+
 
     return None

@@ -34,22 +34,22 @@ class OnePieceProblem(search.Problem):
         self.treasures = initial["treasures"]
         self.marine_paths = initial["marine_ships"]
         self.marine_direction = {}
-        for key, value in self.marine_paths:
+        for key, value in self.marine_paths.items():
             self.marine_direction[key] = "forward"
 
         for i in range(len(self.map)):
             for j in range(len(self.map[0])):
                 if self.map[i][j] == "B":
                     base_location = (i, j)
-        self.base = base_location
-
+                    self.base = base_location
+        start_state = {}
         start_state["base"] = self.base
 
         # Start build the initial state , we want ships location
-        start_state["pirate_ships"] = {self.pirate_ships}
+        start_state["pirate_ships"] = self.pirate_ships
 
         marine_locations = {}
-        for key, value in self.marine_paths:
+        for key, value in self.marine_paths.items():
             marine_name = key
             marine_start = value[0]
             marine_locations[marine_name] = marine_start
@@ -60,7 +60,7 @@ class OnePieceProblem(search.Problem):
         start_state["treasures_in_base"] = {}
         # We want to model the loading of treasure
         treasures_on_ship = {}
-        for key, value in self.pirate_ships:
+        for key, value in self.pirate_ships.items():
             treasures_on_ship[key] = []
         start_state["treasures_on_ship"] = treasures_on_ship
 
@@ -82,7 +82,7 @@ class OnePieceProblem(search.Problem):
         down_border, up_border = len(map) - 1, 0
 
         all_actions_all_ships = []
-        for key, value in state[pirate_ship]:
+        for key, value in state["pirate_ship"].items():
             optional_actions_per_ship = []
             x, y = value[0], value[1]
             # Sail
@@ -108,25 +108,25 @@ class OnePieceProblem(search.Problem):
             # Collect Treasures
             # treasure down
             if x < down_border and map[x + 1][y] == "I" and (x + 1, y) in self.treasures.values() and len(self.treasures_on_ship[key]) < 2:
-                treasure_name = get_key((x + 1, y))
+                treasure_name = self.get_key((x + 1, y),self.treasures)
                 collect_treasure_down = ("collect_treasure", key, treasure_name)
                 optional_actions_per_ship.append(collect_treasure_down)
 
             # treasure up
             if x > up_border and map[x - 1][y] == "I" and (x - 1, y) in self.treasures.values() and len(self.treasures_on_ship[key]) < 2:
-                treasure_name = get_key((x - 1, y))
+                treasure_name = self.get_key((x - 1, y),self.treasures)
                 collect_treasure_up = ("collect_treasure", key, treasure_name)
                 optional_actions_per_ship.append(collect_treasure_up)
 
             # treasure left
             if y > left_border and map[x][y - 1] == "I" and (x, y - 1) in self.treasures.values() and len(self.treasures_on_ship[key]) < 2:
-                treasure_name = get_key((x, y - 1))
+                treasure_name = self.get_key((x, y - 1),self.treasures)
                 collect_treasure_left = ("collect_treasure", key, treasure_name)
                 optional_actions_per_ship.append(collect_treasure_left)
 
             # treasure right
             if y < right_border and map[x][y + 1] == "I" and (x, y + 1) in self.treasures.values() and len(self.treasures_on_ship[key]) < 2:
-                treasure_name = get_key((x, y + 1))
+                treasure_name = self.get_key((x, y + 1),self.treasures)
                 collect_treasure_right = ("collect_treasure", key, treasure_name)
                 optional_actions_per_ship.append(collect_treasure_right)
 
@@ -146,7 +146,7 @@ class OnePieceProblem(search.Problem):
         action in the given state. The action must be one of
         self.actions(state)."""
         # move pirate ship's to the next step , go over every ship
-        for key, value in state["marine_locations"]:
+        for key, value in state["marine_locations"].items():
             # if the ship is static and array len is one so go on
             if len(value) == 1:
                 continue
@@ -190,7 +190,7 @@ class OnePieceProblem(search.Problem):
                 # pop the value of the treasure as he has benn collected
                 state["treasures"].pop(action[1])
 
-            for key, value in state["pirate_ships"]:
+            for key, value in state["pirate_ships"].items():
                 if value in state["marine_ships_locations"]:
                     for treasure in state["treasures_on_ship"][key]:
                         # check treasures when it is tuple or name
@@ -202,8 +202,8 @@ class OnePieceProblem(search.Problem):
     def goal_test(self, state):
         """ Given a state, checks if this is the goal state.
          Returns True if it is, False otherwise."""
-        first_hash_value = dict_hash(state["treasures_in_base"])
-        second_hash_value = dict_hash(self.goal)
+        first_hash_value = self.dict_hash(state["treasures_in_base"])
+        second_hash_value = self.dict_hash(self.goal["treasures_in_base"])
         return first_hash_value == second_hash_value
 
     def h(self, node):
@@ -215,7 +215,7 @@ class OnePieceProblem(search.Problem):
     """Feel free to add your own functions
     (-2, -2, None) means there was a timeout"""
 
-    def dict_hash(dictionary: Dict[str, Any]) -> str:
+    def dict_hash(self,dictionary: Dict[str, Any]) -> str:
         """MD5 hash of a dictionary."""
         dhash = hashlib.md5()
         # We need to sort arguments so {'a': 1, 'b': 2} is
@@ -224,7 +224,7 @@ class OnePieceProblem(search.Problem):
         dhash.update(encoded)
         return dhash.hexdigest()
 
-    def get_key(val):
+    def get_key(self ,val , my_dict):
         for key, value in my_dict.items():
             if val == value:
                 return key
