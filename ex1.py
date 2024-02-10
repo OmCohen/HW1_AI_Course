@@ -4,6 +4,7 @@ import math
 from typing import Dict, Any
 import hashlib
 import json
+from itertools import product
 
 
 
@@ -80,9 +81,8 @@ class OnePieceProblem(search.Problem):
         map = self.map
         right_border, left_border = len(map[0]) - 1, 0
         down_border, up_border = len(map) - 1, 0
-
         all_actions_all_ships = []
-        for key, value in state["pirate_ship"].items():
+        for key, value in state["pirate_ships"].items():
             optional_actions_per_ship = []
             x, y = value[0], value[1]
             # Sail
@@ -107,31 +107,31 @@ class OnePieceProblem(search.Problem):
 
             # Collect Treasures
             # treasure down
-            if x < down_border and map[x + 1][y] == "I" and (x + 1, y) in self.treasures.values() and len(self.treasures_on_ship[key]) < 2:
-                treasure_name = self.get_key((x + 1, y),self.treasures)
+            if x < down_border and map[x + 1][y] == "I" and (x + 1, y) in state["treasures"].values() and len(state["treasures_on_ship"][key]) < 2:
+                treasure_name = self.get_key((x + 1, y),state["treasures"])
                 collect_treasure_down = ("collect_treasure", key, treasure_name)
                 optional_actions_per_ship.append(collect_treasure_down)
 
             # treasure up
-            if x > up_border and map[x - 1][y] == "I" and (x - 1, y) in self.treasures.values() and len(self.treasures_on_ship[key]) < 2:
-                treasure_name = self.get_key((x - 1, y),self.treasures)
+            if x > up_border and map[x - 1][y] == "I" and (x - 1, y) in state["treasures"].values() and len(state["treasures_on_ship"][key]) < 2:
+                treasure_name = self.get_key((x - 1, y),state["treasures"])
                 collect_treasure_up = ("collect_treasure", key, treasure_name)
                 optional_actions_per_ship.append(collect_treasure_up)
 
             # treasure left
-            if y > left_border and map[x][y - 1] == "I" and (x, y - 1) in self.treasures.values() and len(self.treasures_on_ship[key]) < 2:
-                treasure_name = self.get_key((x, y - 1),self.treasures)
+            if y > left_border and map[x][y - 1] == "I" and (x, y - 1) in state["treasures"].values() and len(state["treasures_on_ship"][key]) < 2:
+                treasure_name = self.get_key((x, y - 1),state["treasures"])
                 collect_treasure_left = ("collect_treasure", key, treasure_name)
                 optional_actions_per_ship.append(collect_treasure_left)
 
             # treasure right
-            if y < right_border and map[x][y + 1] == "I" and (x, y + 1) in self.treasures.values() and len(self.treasures_on_ship[key]) < 2:
-                treasure_name = self.get_key((x, y + 1),self.treasures)
+            if y < right_border and map[x][y + 1] == "I" and (x, y + 1) in state["treasures"].values() and len(state["treasures_on_ship"][key]) < 2:
+                treasure_name = self.get_key((x, y + 1),state["treasures"])
                 collect_treasure_right = ("collect_treasure", key, treasure_name)
                 optional_actions_per_ship.append(collect_treasure_right)
 
             # Deposit Treasure
-            if map[x][y] == "B" and self.treasures_on_ship[key] != []:
+            if map[x][y] == "B" and state["treasures_on_ship"][key] != []:
                 deposit = ("deposit_treasure", key)
                 optional_actions_per_ship.append(deposit)
 
@@ -139,7 +139,9 @@ class OnePieceProblem(search.Problem):
             wait = ("wait", key)
             optional_actions_per_ship.append(wait)
 
-        all_actions_all_ships.append(optional_actions_per_ship)
+            all_actions_all_ships.append(optional_actions_per_ship)
+        cartesian_Product = list(product(*all_actions_all_ships, repeat=1))
+        return cartesian_Product
 
     def result(self, state, action):
         """Return the state that results from executing the given
@@ -148,7 +150,7 @@ class OnePieceProblem(search.Problem):
         # move pirate ship's to the next step , go over every ship
         for key, value in state["marine_locations"].items():
             # if the ship is static and array len is one so go on
-            if len(value) == 1:
+            if len(self.marine_paths[key]) == 1:
                 continue
 
             if self.marine_direction[key] == "forward":
@@ -175,27 +177,32 @@ class OnePieceProblem(search.Problem):
                 continue
             # continue to the next sail point
             if one_action[0] == "sail":
-                state["pirate_ships"][action[1]] = action[2]
+                state["pirate_ships"][one_action[1]] = one_action[2]
             # deposit all treasures on ship to base
-            if one_action[0] == "deposit":
-                for treasure in state["treasures_on_ship"][action[1]]:
-                    # check treasures when it is tuple or name
-                    state["treasures_in_base"][treasure] = state[treasure]
-                state["treasures_on_ship"][action[1]].clear()
+            #(“deposit_treasure”, “pirate_1”)
+            if one_action[0] == "deposit_treasure":
+                hash_list = []
+                for key, value in state["treasures_in_base"].items():
+                    hash_list.append((key,value))
+                for treasure in state["treasures_on_ship"][one_action[1]]:
+                    if treasure not in hash_list:
+                        state["treasures_in_base"][treasure[0]] = treasure[1]
+                state["treasures_on_ship"][one_action[1]].clear()
 
-            if one_action[0] == "collect":
+            if one_action[0] == "collect_treasure":
                 # take the treasure to the ship
                 # check treasures when it is tuple or name
-                state["treasures_on_ship"][action[1]] = self.treasures[action[2]]
-                # pop the value of the treasure as he has benn collected
-                state["treasures"].pop(action[1])
+                state["treasures_on_ship"][one_action[1]].append((one_action[2],self.treasures[one_action[2]]))
 
-            for key, value in state["pirate_ships"].items():
-                if value in state["marine_ships_locations"]:
-                    for treasure in state["treasures_on_ship"][key]:
-                        # check treasures when it is tuple or name
-                        state["treasures"][treasure] = treasure
-                    state["treasures_on_ship"][key] = []
+        for key, value in state["pirate_ships"].items():
+            # x_val , y_val = value[0] , value[1]
+            # if x_val
+
+            if value in list(state["marine_locations"].values()):
+                for treasure in state["treasures_on_ship"][key]:
+                    # check treasures when it is tuple or name
+                    state["treasures"][treasure] = treasure
+                state["treasures_on_ship"][key] = []
         result = state
         return result
 
@@ -210,10 +217,99 @@ class OnePieceProblem(search.Problem):
         """ This is the heuristic. It gets a node (not a state,
         state can be accessed via node.state)
         and returns a goal distance estimate"""
-        return 0
+        return self.h_1(node)
 
     """Feel free to add your own functions
     (-2, -2, None) means there was a timeout"""
+
+
+    def h_1(self,node):
+        state = node.getstate()
+        #lets figure which treasures in base :
+        base_treasures = list(state["treasures_in_base"].keys())
+        #[treasure_1 , treasure_2]
+        #Lets figure which treasures are in
+        parsed_list = list(state["treasures_on_ship"].values())
+        for i in parsed_list:
+            #if there is no treasure on ship the list will be []
+            if len(i) == 0 :
+                continue
+            #check if base hasn't this treasure
+            for j in i:
+                if j[0] not in base_treasures:
+                    base_treasures.append(j[0])
+        return (len(self.treasures) - len(base_treasures))/ len(self.pirate_ships)
+
+    def h_2(self,Node):
+        state = Node.getstate()
+        sum_distances = 0
+        # Board borders
+        map = self.map
+        right_border, left_border = len(map[0]) - 1, 0
+        down_border, up_border = len(map) - 1, 0
+        for t_num, t_location in state["treasures"].items():
+            # If treasure already deposit, the distance is zero
+            if t_num in list(state["treasures_in_base"].keys()):
+                sum_distances += 0
+                continue
+            # If everywhere is islands, return infinty
+            x_t, y_t = t_location[0], t_location[1]
+            # False == sea,  True == Island or unreachable
+            up, down, left, right = True, True, True, True
+            #down
+            if x_t < down_border and map[x_t + 1][y_t] != "I":
+                down = False
+            #up
+            if x_t > up_border and map[x_t - 1][y_t] != "I":
+                up = False
+            # left
+            if y_t > left_border and map[x_t][y_t - 1] != "I":
+                left = False
+            #right
+            if y_t < right_border and map[x_t][y_t + 1] != "I":
+                right = False
+            # if no access at all, return infinity
+            if up and down and left and right:
+                sum_distances += float('inf')
+                break
+            # if treasure on ships and not deposit
+            # for each ship, if the treasure on ship, find the distance from the ship to the base
+            minimum_distance = float('inf')
+            for ship, treasures_list in state["treasures_on_ship"].items():
+                if (t_num , t_location) in treasures_list:
+                    ship_location = state["pirate_ships"][ship]
+                    x_ship , y_ship = ship_location[0], ship_location[1]
+                    ship_distance = abs(x_t - x_ship) + abs(y_t - y_ship)
+                    if ship_distance < minimum_distance:
+                        minimum_distance = ship_distance
+            # take the minimum distance
+            if minimum_distance < float('inf'):
+                sum_distances += minimum_distance
+                continue
+            minimum_distance = float('inf')
+            x_base , y_base = self.base[0], self.base[1]
+            if not up:
+                adjacent_distance = abs(x_t - 1 - x_base) + abs(y_t - y_base)
+                if adjacent_distance < minimum_distance:
+                    minimum_distance = adjacent_distance
+            if not down:
+                adjacent_distance = abs(x_t + 1 - x_base) + abs(y_t - y_base)
+                if adjacent_distance < minimum_distance:
+                    minimum_distance = adjacent_distance
+            if not left:
+                adjacent_distance = abs(x_t - x_base) + abs(y_t - 1 - y_base)
+                if adjacent_distance < minimum_distance:
+                    minimum_distance = adjacent_distance
+            if not right:
+                adjacent_distance = abs(x_t - x_base) + abs(y_t + 1 - y_base)
+                if adjacent_distance < minimum_distance:
+                    minimum_distance = adjacent_distance
+            if minimum_distance < float('inf'):
+                sum_distances += minimum_distance
+                continue
+        return sum_distances / len(self.pirate_ships)
+
+
 
     def dict_hash(self,dictionary: Dict[str, Any]) -> str:
         """MD5 hash of a dictionary."""

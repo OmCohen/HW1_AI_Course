@@ -2,6 +2,33 @@ from typing import Dict, Any
 import hashlib
 import json
 
+from itertools import product, zip_longest
+
+
+def generate_combinations(lists):
+    # Generate combinations using itertools.product
+    combinations = product(*zip_longest(*lists, fillvalue=None))
+    # Filter out combinations where any element is None
+    combinations = filter(lambda x: all(item is not None for item in x), combinations)
+    # Convert combinations to tuple of tuples
+    combinations = tuple(map(tuple, combinations))
+
+    return combinations
+
+
+# Test the function
+input_lists = [[("wait", "pirate_ship1"), ("sail", "pirate_ship1", "up")],
+    [("sail", "pirate_ship2", "up")],
+    [("sail", "pirate_ship3", "up"), ("sail", "pirate_ship3", "down"), ("sail", "pirate_ship3", "left")]]
+result = list(product(*input_lists, repeat=1))
+for i in result:
+    print(i)
+print(result)
+
+
+
+
+
 # def dict_hash(dictionary: Dict[str, Any]) -> str:
 #     """MD5 hash of a dictionary."""
 #     dhash = hashlib.md5()

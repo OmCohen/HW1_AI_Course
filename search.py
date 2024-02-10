@@ -15,7 +15,11 @@ import math
 import random
 import sys
 import bisect
-
+import random
+import math
+from typing import Dict, Any
+import hashlib
+import json
 infinity = float('inf')
 
 # ______________________________________________________________________________
@@ -136,8 +140,13 @@ class Node:
     def __hash__(self):
         return hash(self.state)
 
-    def __getstate__(self):
+    def getpath_cost(self):
+        return self.path_cost
+
+    def getstate(self):
         return self.state
+
+
 # ______________________________________________________________________________
 
 
@@ -154,13 +163,33 @@ def astar_search(problem, h=None):
 
     # TODO: Implement the rest of the A* search algorithm
     #new min queue
-    open = utils.PriorityQueue(order = min , lambda x: x.path_cost + h(x))
+    open = utils.PriorityQueue(order = min , f=f)
     #starting Node is the initial
     start = Node(problem.initial)
     open.append(start)
     closed = []
+    distance = {}
     while len(open) != 0:
-        new = open.pop()
-
+        new:Node = open.pop()
+        new_hash = dict_hash(new.getstate())
+        if (new_hash in distance and new.getpath_cost() < distance[new_hash]) or new_hash not in closed  :
+            closed.append(new_hash)
+            distance[new_hash] = new.getpath_cost()
+            if problem.goal_test(new.getstate()):
+                return new.path
+            for child in new.expand(problem):
+                if h(child) < infinity:
+                    open.append(child)
 
     return None
+
+
+
+def dict_hash(dictionary: Dict[str, Any]) -> str:
+    """MD5 hash of a dictionary."""
+    dhash = hashlib.md5()
+    # We need to sort arguments so {'a': 1, 'b': 2} is
+    # the same as {'b': 2, 'a': 1}
+    encoded = json.dumps(dictionary, sort_keys=True).encode()
+    dhash.update(encoded)
+    return dhash.hexdigest()
