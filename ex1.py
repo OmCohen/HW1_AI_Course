@@ -158,9 +158,10 @@ class OnePieceProblem(search.Problem):
                 if self.marine_paths[key].index(value) == len(self.marine_paths[key]) - 1:
                     self.marine_direction[key] = "back"
                     state["marine_locations"][key] = self.marine_paths[key][-2]
-                # if i'm in the miidle
+                # if i'm in the middle
                 else:
                     state["marine_locations"][key] = self.marine_paths[key][self.marine_paths[key].index(value) + 1]
+                continue
 
             if self.marine_direction[key] == "back":
                 # if i reached the start so go back forward
@@ -178,6 +179,7 @@ class OnePieceProblem(search.Problem):
             # continue to the next sail point
             if one_action[0] == "sail":
                 state["pirate_ships"][one_action[1]] = one_action[2]
+                continue
             # deposit all treasures on ship to base
             #(“deposit_treasure”, “pirate_1”)
             if one_action[0] == "deposit_treasure":
@@ -188,6 +190,7 @@ class OnePieceProblem(search.Problem):
                     if treasure not in hash_list:
                         state["treasures_in_base"][treasure[0]] = treasure[1]
                 state["treasures_on_ship"][one_action[1]].clear()
+                continue
 
             if one_action[0] == "collect_treasure":
                 # take the treasure to the ship
@@ -195,13 +198,8 @@ class OnePieceProblem(search.Problem):
                 state["treasures_on_ship"][one_action[1]].append((one_action[2],self.treasures[one_action[2]]))
 
         for key, value in state["pirate_ships"].items():
-            # x_val , y_val = value[0] , value[1]
-            # if x_val
 
-            if value in list(state["marine_locations"].values()):
-                for treasure in state["treasures_on_ship"][key]:
-                    # check treasures when it is tuple or name
-                    state["treasures"][treasure] = treasure
+            if value in state["marine_locations"].values():
                 state["treasures_on_ship"][key] = []
         result = state
         return result

@@ -176,7 +176,7 @@ def astar_search(problem, h=None):
             closed.append(new_hash)
             distance[new_hash] = new.getpath_cost()
             if problem.goal_test(new.getstate()):
-                return new.path
+                return new.path()
             for child in new.expand(problem):
                 if h(child) < infinity:
                     open.append(child)
