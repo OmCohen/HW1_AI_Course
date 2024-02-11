@@ -5,7 +5,7 @@ from typing import Dict, Any
 import hashlib
 import json
 from itertools import product
-
+import copy
 
 
 
@@ -33,6 +33,7 @@ class OnePieceProblem(search.Problem):
         self.map = initial["map"]
         self.pirate_ships = initial["pirate_ships"]
         self.treasures = initial["treasures"]
+        #ask whats happen if there is no marine ships
         self.marine_paths = initial["marine_ships"]
         self.marine_direction = {}
         for key, value in self.marine_paths.items():
@@ -148,7 +149,11 @@ class OnePieceProblem(search.Problem):
         action in the given state. The action must be one of
         self.actions(state)."""
         # move pirate ship's to the next step , go over every ship
-        for key, value in state["marine_locations"].items():
+        result = copy.deepcopy(state)
+        for key, value in result["marine_locations"].items():
+            #if there is no marine ships than break
+            if result["marine_locations"] is None:
+                break
             # if the ship is static and array len is one so go on
             if len(self.marine_paths[key]) == 1:
                 continue
@@ -157,20 +162,20 @@ class OnePieceProblem(search.Problem):
                 # if i reached the end so go back on track
                 if self.marine_paths[key].index(value) == len(self.marine_paths[key]) - 1:
                     self.marine_direction[key] = "back"
-                    state["marine_locations"][key] = self.marine_paths[key][-2]
+                    result["marine_locations"][key] = self.marine_paths[key][-2]
                 # if i'm in the middle
                 else:
-                    state["marine_locations"][key] = self.marine_paths[key][self.marine_paths[key].index(value) + 1]
+                    result["marine_locations"][key] = self.marine_paths[key][self.marine_paths[key].index(value) + 1]
                 continue
 
             if self.marine_direction[key] == "back":
                 # if i reached the start so go back forward
                 if self.marine_paths[key].index(value) == 0:
                     self.marine_direction[key] = "forward"
-                    state["marine_locations"][key] = self.marine_paths[key][1]
+                    result["marine_locations"][key] = self.marine_paths[key][1]
                 # if i'm in the middle
                 else:
-                    state["marine_locations"][key] = self.marine_paths[key][self.marine_paths[key].index(value) - 1]
+                    result["marine_locations"][key] = self.marine_paths[key][self.marine_paths[key].index(value) - 1]
         # lets iterate over the actions
         for one_action in action:
             # dont need to do anything
@@ -178,31 +183,34 @@ class OnePieceProblem(search.Problem):
                 continue
             # continue to the next sail point
             if one_action[0] == "sail":
-                state["pirate_ships"][one_action[1]] = one_action[2]
+                result["pirate_ships"][one_action[1]] = one_action[2]
                 continue
             # deposit all treasures on ship to base
             #(“deposit_treasure”, “pirate_1”)
             if one_action[0] == "deposit_treasure":
                 hash_list = []
-                for key, value in state["treasures_in_base"].items():
+                for key, value in result["treasures_in_base"].items():
                     hash_list.append((key,value))
-                for treasure in state["treasures_on_ship"][one_action[1]]:
+                for treasure in result["treasures_on_ship"][one_action[1]]:
                     if treasure not in hash_list:
-                        state["treasures_in_base"][treasure[0]] = treasure[1]
-                state["treasures_on_ship"][one_action[1]].clear()
+                        result["treasures_in_base"][treasure[0]] = treasure[1]
+                result["treasures_on_ship"][one_action[1]].clear()
                 continue
 
             if one_action[0] == "collect_treasure":
                 # take the treasure to the ship
                 # check treasures when it is tuple or name
-                state["treasures_on_ship"][one_action[1]].append((one_action[2],self.treasures[one_action[2]]))
+                result["treasures_on_ship"][one_action[1]].append((one_action[2], self.treasures[one_action[2]]))
 
-        for key, value in state["pirate_ships"].items():
-            if value in state["marine_locations"].values():
-                if len(state["treasures_on_ship"][key]) == 0:
+        for key, value in result["pirate_ships"].items():
+            #if there is no marine ships so pass
+            if result["marine_locations"] == None:
+                break
+            if value in result["marine_locations"].values():
+                if len(result["treasures_on_ship"][key]) == 0:
                     continue
-                else:state["treasures_on_ship"][key].clear()
-        result = state
+                else:result["treasures_on_ship"][key].clear()
+
         print(result)
         return result
 
