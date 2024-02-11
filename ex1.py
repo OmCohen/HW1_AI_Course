@@ -131,7 +131,7 @@ class OnePieceProblem(search.Problem):
                 optional_actions_per_ship.append(collect_treasure_right)
 
             # Deposit Treasure
-            if map[x][y] == "B" and state["treasures_on_ship"][key] != []:
+            if map[x][y] == "B" and len(state["treasures_on_ship"][key]) != 0:
                 deposit = ("deposit_treasure", key)
                 optional_actions_per_ship.append(deposit)
 
@@ -198,10 +198,12 @@ class OnePieceProblem(search.Problem):
                 state["treasures_on_ship"][one_action[1]].append((one_action[2],self.treasures[one_action[2]]))
 
         for key, value in state["pirate_ships"].items():
-
             if value in state["marine_locations"].values():
-                state["treasures_on_ship"][key] = []
+                if len(state["treasures_on_ship"][key]) == 0:
+                    continue
+                else:state["treasures_on_ship"][key].clear()
         result = state
+        print(result)
         return result
 
     def goal_test(self, state):
