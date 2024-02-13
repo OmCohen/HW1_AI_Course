@@ -171,12 +171,11 @@ def astar_search(problem, h=None):
     distance = {}
     while len(open) != 0:
         new:Node = open.pop()
-        new_hash = dict_hash(new.getstate())
-        if (new_hash in distance and new.getpath_cost() < distance[new_hash]) or new_hash not in closed  :
-            closed.append(new_hash)
-            distance[new_hash] = new.getpath_cost()
-            if problem.goal_test(new.getstate()):
-                return new.path()
+        if (new.state in distance and new.path_cost < distance[new.state.__str__]) or new.state not in closed :
+            closed.append(new.state)
+            distance[new.state.__str__] = new.path_cost
+            if problem.goal_test(new.state):
+                return new
             for child in new.expand(problem):
                 if h(child) < infinity:
                     open.append(child)
@@ -185,11 +184,4 @@ def astar_search(problem, h=None):
 
 
 
-def dict_hash(dictionary: Dict[str, Any]) -> str:
-    """MD5 hash of a dictionary."""
-    dhash = hashlib.md5()
-    # We need to sort arguments so {'a': 1, 'b': 2} is
-    # the same as {'b': 2, 'a': 1}
-    encoded = json.dumps(dictionary, sort_keys=True).encode()
-    dhash.update(encoded)
-    return dhash.hexdigest()
+

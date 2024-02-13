@@ -5,8 +5,6 @@ from typing import Dict, Any
 import hashlib
 import json
 from itertools import product
-import copy
-
 
 
 ids = ["209512664", "206703191"]
@@ -45,7 +43,6 @@ class OnePieceProblem(search.Problem):
                     base_location = (i, j)
                     self.base = base_location
         start_state = {}
-        start_state["base"] = self.base
 
         # Start build the initial state , we want ships location
         start_state["pirate_ships"] = self.pirate_ships
@@ -63,14 +60,23 @@ class OnePieceProblem(search.Problem):
         # We want to model the loading of treasure
         treasures_on_ship = {}
         for key, value in self.pirate_ships.items():
-            treasures_on_ship[key] = []
+            treasures_on_ship[key] = (None , None)
+
         start_state["treasures_on_ship"] = treasures_on_ship
 
+        start_state["marine_direction"] = {}
+        for key, value in self.marine_paths.items():
+            start_state["marine_direction"][key] = "forward"
+
+        start_state_set = self.dict_to_frozenset(start_state)
 
         # Defined the inital state , now will send to initial in parent class
-        initial = start_state
+        initial = start_state_set
         # Our goal is that treasures in base will be with all treasures
-        self.goal = {"treasures_in_base": self.treasures}
+        goal_dict =  self.treasures
+        self.goal = self.dict_to_frozenset(goal_dict)
+
+
 
         search.Problem.__init__(self, initial,self.goal)
 
@@ -78,66 +84,73 @@ class OnePieceProblem(search.Problem):
         """Returns all the actions that can be executed in the given
         state. The result should be a tuple (or other iterable) of actions
         as defined in the problem description file"""
+        state_dict = self.frozenset_to_dict(state)
         # Define borders
         map = self.map
         right_border, left_border = len(map[0]) - 1, 0
         down_border, up_border = len(map) - 1, 0
+        # Initial new list that will hold all actions for all the ships
         all_actions_all_ships = []
-        for key, value in state["pirate_ships"].items():
+        # Iterate the pirate ships and creates all the possible actions for each ship
+        for ship_name, value in state_dict["pirate_ships"].items():
             optional_actions_per_ship = []
             x, y = value[0], value[1]
             # Sail
             # Sail down
             if x < down_border and map[x + 1][y] != "I":
-                sail_down = ("sail", key, (x + 1, y))
+                sail_down = ("sail", ship_name, (x + 1, y))
                 optional_actions_per_ship.append(sail_down)
             # Sail up
             if x > up_border and map[x - 1][y] != "I":
-                sail_up = ("sail", key, (x - 1, y))
+                sail_up = ("sail", ship_name, (x - 1, y))
                 optional_actions_per_ship.append(sail_up)
 
             # Sail left
             if y > left_border and map[x][y - 1] != "I":
-                sail_left = ("sail", key, (x, y - 1))
+                sail_left = ("sail", ship_name, (x, y - 1))
                 optional_actions_per_ship.append(sail_left)
 
             # Sail right
             if y < right_border and map[x][y + 1] != "I":
-                sail_right = ("sail", key, (x, y + 1))
+                sail_right = ("sail", ship_name, (x, y + 1))
                 optional_actions_per_ship.append(sail_right)
 
             # Collect Treasures
             # treasure down
-            if x < down_border and map[x + 1][y] == "I" and (x + 1, y) in state["treasures"].values() and len(state["treasures_on_ship"][key]) < 2:
-                treasure_name = self.get_key((x + 1, y),state["treasures"])
-                collect_treasure_down = ("collect_treasure", key, treasure_name)
-                optional_actions_per_ship.append(collect_treasure_down)
+            if x < down_border and map[x + 1][y] == "I" and (x + 1, y) in state_dict["treasures"].values() and self.check_capcity(state_dict , ship_name) < 2:
+                keys_number, keys = self.get_all_keys((x + 1, y), state_dict["treasures"])
+                for item in keys:
+                    action = ("collect_treasure", ship_name, item)
+                    optional_actions_per_ship.append(action)
 
             # treasure up
-            if x > up_border and map[x - 1][y] == "I" and (x - 1, y) in state["treasures"].values() and len(state["treasures_on_ship"][key]) < 2:
-                treasure_name = self.get_key((x - 1, y),state["treasures"])
-                collect_treasure_up = ("collect_treasure", key, treasure_name)
-                optional_actions_per_ship.append(collect_treasure_up)
+            if x > up_border and map[x - 1][y] == "I" and (x - 1, y) in state_dict["treasures"].values() and self.check_capcity(state_dict , ship_name) < 2:
+                keys_number, keys = self.get_all_keys((x - 1, y), state_dict["treasures"])
+                for item in keys:
+                    action = ("collect_treasure", ship_name, item)
+                    optional_actions_per_ship.append(action)
 
             # treasure left
-            if y > left_border and map[x][y - 1] == "I" and (x, y - 1) in state["treasures"].values() and len(state["treasures_on_ship"][key]) < 2:
-                treasure_name = self.get_key((x, y - 1),state["treasures"])
-                collect_treasure_left = ("collect_treasure", key, treasure_name)
-                optional_actions_per_ship.append(collect_treasure_left)
+            if y > left_border and map[x][y - 1] == "I" and (x, y - 1) in state_dict["treasures"].values() and self.check_capcity(state_dict , ship_name) < 2:
+                keys_number, keys = self.get_all_keys((x, y - 1), state_dict["treasures"])
+                for item in keys:
+                    action = ("collect_treasure", ship_name, item)
+                    optional_actions_per_ship.append(action)
 
             # treasure right
-            if y < right_border and map[x][y + 1] == "I" and (x, y + 1) in state["treasures"].values() and len(state["treasures_on_ship"][key]) < 2:
-                treasure_name = self.get_key((x, y + 1),state["treasures"])
-                collect_treasure_right = ("collect_treasure", key, treasure_name)
-                optional_actions_per_ship.append(collect_treasure_right)
+            if y < right_border and map[x][y + 1] == "I" and (x, y + 1) in state_dict["treasures"].values() and self.check_capcity(state_dict , ship_name) < 2:
+                keys_number, keys = self.get_all_keys((x, y + 1), state_dict["treasures"])
+                for item in keys:
+                    action = ("collect_treasure", ship_name, item)
+                    optional_actions_per_ship.append(action)
 
             # Deposit Treasure
-            if map[x][y] == "B" and len(state["treasures_on_ship"][key]) != 0:
-                deposit = ("deposit_treasure", key)
+            if map[x][y] == "B" and self.check_capcity(state_dict , ship_name) != 0:
+                deposit = ("deposit_treasure", ship_name)
                 optional_actions_per_ship.append(deposit)
 
             # Wait
-            wait = ("wait", key)
+            wait = ("wait", ship_name)
             optional_actions_per_ship.append(wait)
 
             all_actions_all_ships.append(optional_actions_per_ship)
@@ -149,7 +162,7 @@ class OnePieceProblem(search.Problem):
         action in the given state. The action must be one of
         self.actions(state)."""
         # move pirate ship's to the next step , go over every ship
-        result = copy.deepcopy(state)
+        result = self.frozenset_to_dict(state)
         for key, value in result["marine_locations"].items():
             #if there is no marine ships than break
             if result["marine_locations"] is None:
@@ -192,72 +205,151 @@ class OnePieceProblem(search.Problem):
                 for key, value in result["treasures_in_base"].items():
                     hash_list.append((key,value))
                 for treasure in result["treasures_on_ship"][one_action[1]]:
-                    if treasure not in hash_list:
-                        result["treasures_in_base"][treasure[0]] = treasure[1]
-                result["treasures_on_ship"][one_action[1]].clear()
+                    if treasure not in hash_list and treasure is not None:
+                        result["treasures_in_base"][treasure] = self.treasures[treasure]
+                result["treasures_on_ship"][one_action[1]] = (None,None)
                 continue
 
             if one_action[0] == "collect_treasure":
                 # take the treasure to the ship
                 # check treasures when it is tuple or name
-                result["treasures_on_ship"][one_action[1]].append((one_action[2], self.treasures[one_action[2]]))
-
+                #check if tuple on place 1 exists
+                if result["treasures_on_ship"][one_action[1]][0] is None:
+                    new_tuple = (one_action[2] , None)
+                    result["treasures_on_ship"][one_action[1]] = new_tuple
+                else:
+                    new_tuple = (result["treasures_on_ship"][one_action[1]][0] ,one_action[2] )
+                    result["treasures_on_ship"][one_action[1]] = new_tuple
         for key, value in result["pirate_ships"].items():
             #if there is no marine ships so pass
-            if result["marine_locations"] == None:
+            if  result["marine_locations"] == {}:
                 break
             if value in result["marine_locations"].values():
-                if len(result["treasures_on_ship"][key]) == 0:
-                    continue
-                else:result["treasures_on_ship"][key].clear()
-
-        print(result)
-        return result
+                result["treasures_on_ship"][key] = (None,None)
+        result_set = self.dict_to_frozenset(result)
+        return result_set
 
     def goal_test(self, state):
         """ Given a state, checks if this is the goal state.
          Returns True if it is, False otherwise."""
-        first_hash_value = self.dict_hash(state["treasures_in_base"])
-        second_hash_value = self.dict_hash(self.goal["treasures_in_base"])
-        return first_hash_value == second_hash_value
+        state_dict = self.frozenset_to_dict(state)
+        goal_part  = self.dict_to_frozenset(state_dict["treasures_in_base"])
+        return self.goal == goal_part
 
     def h(self, node):
         """ This is the heuristic. It gets a node (not a state,
         state can be accessed via node.state)
         and returns a goal distance estimate"""
-        return self.h_1(node)
 
-    """Feel free to add your own functions
-    (-2, -2, None) means there was a timeout"""
-
-
-    def h_1(self,node):
         state = node.getstate()
-        #lets figure which treasures in base :
-        base_treasures = list(state["treasures_in_base"].keys())
-        #[treasure_1 , treasure_2]
-        #Lets figure which treasures are in
-        parsed_list = list(state["treasures_on_ship"].values())
-        for i in parsed_list:
-            #if there is no treasure on ship the list will be []
-            if len(i) == 0 :
-                continue
-            #check if base hasn't this treasure
-            for j in i:
-                if j[0] not in base_treasures:
-                    base_treasures.append(j[0])
-        return (len(self.treasures) - len(base_treasures))/ len(self.pirate_ships)
-
-    def h_2(self,Node):
-        state = Node.getstate()
+        state_dict = self.frozenset_to_dict(state)
         sum_distances = 0
         # Board borders
         map = self.map
         right_border, left_border = len(map[0]) - 1, 0
-        down_border, up_border = len(map) - 1, 0
-        for t_num, t_location in state["treasures"].items():
+        bottom_border, top_border = len(map) - 1, 0
+        for t_name, t_location in state_dict["treasures"].items():
             # If treasure already deposit, the distance is zero
-            if t_num in list(state["treasures_in_base"].keys()):
+            if t_name in list(state_dict["treasures_in_base"].keys()):
+                sum_distances += 0
+                continue
+            # If everywhere is islands, return infinty
+            x_t, y_t = t_location[0], t_location[1]
+            # False == sea,  True == Island or unreachable
+            up, down, left, right = True, True, True, True
+            # down
+            if x_t < bottom_border and map[x_t + 1][y_t] != "I":
+                down = False
+            # up
+            if x_t > top_border and map[x_t - 1][y_t] != "I":
+                up = False
+            # left
+            if y_t > left_border and map[x_t][y_t - 1] != "I":
+                left = False
+            # right
+            if y_t < right_border and map[x_t][y_t + 1] != "I":
+                right = False
+            # if no access at all, return infinity
+            if up and down and left and right:
+                sum_distances += float('inf')
+                break
+            # if treasure on ships and not deposit
+            # for each ship, if the treasure on ship, find the distance from the ship to the base
+            minimum_distance = float('inf')
+            x_base, y_base = self.base[0], self.base[1]
+            for ship, treasures_tuple in state_dict["treasures_on_ship"].items():
+                treasure_list = [treasures_tuple[0], treasures_tuple[1]]
+                if t_name in treasure_list:
+                    ship_location = state_dict["pirate_ships"][ship]
+                    x_ship, y_ship = ship_location[0], ship_location[1]
+                    ship_distance = self.euclidian_distance(x_ship,y_ship ,x_base , y_base)
+                    if ship_distance < minimum_distance:
+                        minimum_distance = ship_distance
+            # take the minimum distance
+            if minimum_distance < float('inf'):
+                sum_distances += minimum_distance
+                continue
+            minimum_distance = float('inf')
+
+            if not up:
+                adjacent_distance =self.euclidian_distance(x_t - 1 ,y_t ,x_base , y_base)
+                if adjacent_distance < minimum_distance:
+                    minimum_distance = adjacent_distance
+            if not down:
+                adjacent_distance = self.euclidian_distance(x_t + 1 ,y_t ,x_base , y_base)
+                if adjacent_distance < minimum_distance:
+                    minimum_distance = adjacent_distance
+            if not left:
+                adjacent_distance = self.euclidian_distance(x_t ,y_t - 1 ,x_base , y_base)
+                if adjacent_distance < minimum_distance:
+                    minimum_distance = adjacent_distance
+            if not right:
+                adjacent_distance = self.euclidian_distance(x_t  ,y_t + 1 ,x_base , y_base)
+                if adjacent_distance < minimum_distance:
+                    minimum_distance = adjacent_distance
+            if minimum_distance < float('inf'):
+                sum_distances += minimum_distance
+                continue
+        return sum_distances / len(self.pirate_ships)
+
+    """Feel free to add your own functions
+    (-2, -2, None) means there was a timeout"""
+
+    def euclidian_distance(self , x_1, y_1 , x_2 , y_2):
+        return pow(pow((x_1 - x_2),2) + pow((y_1 - y_2),2),0.5)
+
+    def h_1(self,node):
+        state = node.getstate()
+        state_dict = self.frozenset_to_dict(state)
+        #lets figure which treasures in base :
+        base_treasures = list(state_dict["treasures_in_base"].keys())
+        #[treasure_1 , treasure_2]
+        #Lets figure which treasures are in
+        parsed_list = list(state_dict["treasures_on_ship"].values())
+        for i in parsed_list:
+            #if there is no treasure on ship the tuple will be (,)
+            if i[0] is None :
+                continue
+            elif i[0] not in base_treasures:
+                base_treasures.append(i[0])
+            if i[1] is None:
+                continue
+            elif i[1] not in base_treasures:
+                base_treasures.append(i[1])
+            #check if base hasn't this treasure
+        return (len(self.treasures) - len(base_treasures))/ len(self.pirate_ships)
+
+    def h_2(self,node):
+        state = node.getstate()
+        state_dict = self.frozenset_to_dict(state)
+        sum_distances = 0
+        # Board borders
+        map = self.map
+        right_border, left_border = len(map[0]) - 1, 0
+        bottom_border, top_border = len(map) - 1, 0
+        for t_name, t_location in state_dict["treasures"].items():
+            # If treasure already deposit, the distance is zero
+            if t_name in list(state_dict["treasures_in_base"].keys()):
                 sum_distances += 0
                 continue
             # If everywhere is islands, return infinty
@@ -265,10 +357,10 @@ class OnePieceProblem(search.Problem):
             # False == sea,  True == Island or unreachable
             up, down, left, right = True, True, True, True
             #down
-            if x_t < down_border and map[x_t + 1][y_t] != "I":
+            if x_t < bottom_border and map[x_t + 1][y_t] != "I":
                 down = False
             #up
-            if x_t > up_border and map[x_t - 1][y_t] != "I":
+            if x_t > top_border and map[x_t - 1][y_t] != "I":
                 up = False
             # left
             if y_t > left_border and map[x_t][y_t - 1] != "I":
@@ -283,11 +375,13 @@ class OnePieceProblem(search.Problem):
             # if treasure on ships and not deposit
             # for each ship, if the treasure on ship, find the distance from the ship to the base
             minimum_distance = float('inf')
-            for ship, treasures_list in state["treasures_on_ship"].items():
-                if (t_num , t_location) in treasures_list:
-                    ship_location = state["pirate_ships"][ship]
+            x_base, y_base = self.base[0], self.base[1]
+            for ship, treasures_tuple in state_dict["treasures_on_ship"].items():
+                treasure_list = [treasures_tuple[0] , treasures_tuple[1]]
+                if t_name in treasure_list:
+                    ship_location = state_dict["pirate_ships"][ship]
                     x_ship , y_ship = ship_location[0], ship_location[1]
-                    ship_distance = abs(x_t - x_ship) + abs(y_t - y_ship)
+                    ship_distance = abs(x_base - x_ship) + abs(y_base - y_ship)
                     if ship_distance < minimum_distance:
                         minimum_distance = ship_distance
             # take the minimum distance
@@ -295,7 +389,7 @@ class OnePieceProblem(search.Problem):
                 sum_distances += minimum_distance
                 continue
             minimum_distance = float('inf')
-            x_base , y_base = self.base[0], self.base[1]
+
             if not up:
                 adjacent_distance = abs(x_t - 1 - x_base) + abs(y_t - y_base)
                 if adjacent_distance < minimum_distance:
@@ -335,7 +429,61 @@ class OnePieceProblem(search.Problem):
 
         return "key doesn't exist"
 
+    def get_all_keys(self, val, my_dict):
+        keys_list = []
+        for key, value in my_dict.items():
+            if val == value:
+                keys_list.append(key)
+
+        if keys_list:
+            return len(keys_list) , keys_list
+        else:
+            return "No keys found for the given value"
+
+
+    # def find_all_treasures_in_island(self, state_dict, keys, key):
+    #     #treasures_in_location = self.get_all_keys((x, y), state_dict["treasures"])
+    #     for treasure_name in keys:
+    #         collect_treasures = ("collect_treasure", key, treasure_name)
+    #         return collect_treasures
+
+
+    def dict_to_frozenset(self, dict_of_dicts):
+        dict_of_frozensets = {}
+        for internal_dict_name, internal_dict in dict_of_dicts.items():
+            if isinstance(internal_dict, dict):
+                frozen_internal_dict = frozenset(internal_dict.items())
+                dict_of_frozensets[internal_dict_name] = frozen_internal_dict
+            else:
+                dict_of_frozensets[internal_dict_name] = internal_dict
+
+        frozenset_of_frozensets = frozenset(dict_of_frozensets.items())
+        return frozenset_of_frozensets
+    def check_capcity(self ,state ,key):
+        if state["treasures_on_ship"][key][0] is None:
+            return 0
+        if state["treasures_on_ship"][key][1] is None:
+            return 1
+        else:return 2
+    def frozenset_to_dict(self, frozenset_of_sets):
+        dict_of_dicts = {}
+        for frozen_set in frozenset_of_sets:
+            #dict_from_tuple = {}
+            frozen_to_tuple = tuple(frozen_set)
+            outer_dict_name = frozen_to_tuple[0]
+            dict_values = frozen_to_tuple[1]
+            inner_dict = {}
+
+            for value in dict_values:
+                if isinstance(value, tuple):
+                    inner_dict_name = value[0]
+                    inner_dict_values = value[1]
+                    inner_dict[inner_dict_name] = inner_dict_values
+                else:
+                    dict_of_dicts[outer_dict_name] = dict_values
+            dict_of_dicts[outer_dict_name] = inner_dict
+        return dict_of_dicts
+
+
 def create_onepiece_problem(game):
     return OnePieceProblem(game)
-
-

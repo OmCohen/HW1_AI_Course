@@ -4,6 +4,23 @@ import json
 
 from itertools import product, zip_longest
 
+def get_keys(val, my_dict):
+    keys_list = []
+    for key, value in my_dict.items():
+        if val == value:
+            keys_list.append(key)
+
+    if keys_list:
+        return keys_list
+    else:
+        return "No keys found for the given value"
+
+# Example usage:
+my_dict = {'a': 1, 'b': 2, 'c': 1, 'd': 3}
+value_to_find = 1
+
+result = get_keys(value_to_find, my_dict)
+print(result)
 
 def generate_combinations(lists):
     # Generate combinations using itertools.product
@@ -20,10 +37,10 @@ def generate_combinations(lists):
 input_lists = [[("wait", "pirate_ship1"), ("sail", "pirate_ship1", "up")],
     [("sail", "pirate_ship2", "up")],
     [("sail", "pirate_ship3", "up"), ("sail", "pirate_ship3", "down"), ("sail", "pirate_ship3", "left")]]
-result = list(product(*input_lists, repeat=1))
-for i in result:
-    print(i)
-print(result)
+# result = list(product(*input_lists, repeat=1))
+# for i in result:
+#     print(i)
+# print(result)
 
 
 
